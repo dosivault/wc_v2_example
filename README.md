@@ -1,4 +1,4 @@
-# WalletConnect v1과 dApp 연동 예제
+# WalletConnect v2과 dApp 연동 예제
 
 ## 실행법
 
