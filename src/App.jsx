@@ -92,9 +92,8 @@ function App() {
     }
 
     async function handleSignArbitraryMsg() {
-        const [resp] = await signClient.request({
-            // chainId: CAIP_BLOCKCHAIN_ID,
-            chainId: `finschia:${CHAIN_ID}`,
+        const resp = await signClient.request({
+            chainId: CAIP_BLOCKCHAIN_ID,
             request: {
                 method: "cosmos_sign_free_message",
                 params: {
@@ -104,7 +103,8 @@ function App() {
             },
             topic: session.topic
         });
-        setSignature(resp.signature);
+        console.log('sign resp', resp);
+        setSignature(resp.signature.signature);
     }
 
     return (
