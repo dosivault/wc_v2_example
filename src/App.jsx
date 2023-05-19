@@ -1,67 +1,85 @@
 import {useEffect, useState} from 'react'
+import { SignClient } from '@walletconnect/sign-client';
+import { Web3Modal } from '@web3modal/standalone';
 import './App.css'
-import WalletConnect from "@walletconnect/client";
-import WalletConnectQRCodeModal from "@walletconnect/qrcode-modal";
 
-const CHAIN_ID = "finschia-1";
-let client = new WalletConnect({
-    bridge: 'https://bridge.walletconnect.org',
-    clientMeta: {
-        name: "dApp example",
-        description: "Just another dApp",
-        url: "https://dapp.example/com",
+
+// Your dapp's Project ID from https://cloud.walletconnect.com/
+const WC_PROJECT_ID = '9e1152b9dc0318eea105dc31238fbc00';
+// CAUTION) it'll be changed to `finschia-2` around the end of May 2023
+const CHAIN_ID = 'finschia-1';
+// https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-2.md
+const CAIP_BLOCKCHAIN_ID = `cosmos:${CHAIN_ID}`
+const signClient = await SignClient.init({
+    projectId: WC_PROJECT_ID,
+    metadata: {
+        name: "WC2 dApp",
+        description: "WalletConnect v2 Dapp Example for DOSI Vault Extension",
+        url: "https://dapp.example.com",
         icons: ["https://i.pinimg.com/600x315/93/3e/14/933e14abb0241584fd6d5a31bea1ce7b.jpg"],
     },
 });
+const connection = await signClient.connect({});
+
+function parseAccount(account) {
+    // example `cosmos:finschia-beta-2:link1a509xf4stwa9yaec5vu64fcem5zeyc3t7t47fc`
+    const parts = account.split(':');
+    return {
+        ns: parts[0],
+        chainId: parts[1],
+        bech32: parts[2]
+    }
+}
+
+async function initSignClient() {
+    
+}
 
 function App() {
-    const [sessionUri, setSessionUri] = useState(null);
+    const [wcUri, setWcUri] = useState(null);
     const [address, setAddress] = useState(null);
+    const [session, setSession] = useState(null);
     const [msgToSign, setMsgToSign] = useState('Any text');
     const [signature, setSignature] = useState(null);
     const [dynamicLinkBase, setDynamicLinkBase] = useState("https://dosivault.page.link/qL6j");
     
     useEffect(() => {
-        console.log('like componentDidMount()');
         // componentDidMount()
-        client.on("connect", async (error, payload) => {
-            if (error) {
-                setSessionUri(null);
-                throw error;
-            }
-            WalletConnectQRCodeModal.close();
-            // no useful information in 'payload' since WalletConnect v1 is only for EVM-compatible chains
-            // https://github.com/chainapsis/keplr-wallet/blob/master/packages/mobile/src/stores/wallet-connect/index.ts#L42
-            console.log('on "connect"', payload, client.connected);
-            const addrFromVault = await fetchAddress();
-            setAddress(addrFromVault);
-        });
+        console.log('like componentDidMount()');
     
-        client.on("disconnect", (error, payload) => {
+        console.log('signClient', signClient);
+
+        signClient.on("disconnect", (error, payload) => {
             console.log('on "disconnect"');
-            setSessionUri(null);
+            setWcUri(null);
             setAddress(null);
         });
+        setWcUri(connection.uri);
     
-        (async () => {
-            // create a session on page load
-            if(client.connected) {
-                await client.killSession();
-            }
-
-            await client.createSession();
-            setSessionUri(client.uri);    
-        })();
         return () => {    // clean up (componetWillUnmount)
             console.log('like componentWillUnmount()');
-            client.off("connect");
-            client.off("disconnect");
+            signClient.removeAllListeners("connect");
+            signClient.removeAllListeners("disconnect");
         };
     }, []);
     
     async function showQRCodeModal() {
-        console.log('connectWallet() clientid', client.clientId);
-        WalletConnectQRCodeModal.open(client.uri);
+        console.log('waiting approval() to be completed');
+        const web3modal = new Web3Modal({
+            walletConnectVersion: 2,
+            projectId: WC_PROJECT_ID,
+            standaloneChains: [CAIP_BLOCKCHAIN_ID]
+        });
+        await web3modal.openModal({
+            uri: connection.uri
+        });
+        const ses = await connection.approval();
+        console.log('session approved', ses);
+        setSession(ses);
+        web3modal.closeModal();
+        // address from 'cosmos' namespace account
+        const bech32 = parseAccount(ses.namespaces.cosmos.accounts[0]).bech32;
+        setAddress(bech32);
     }
 
     function getDynamicLinkUrl(wcUrl) {
@@ -73,34 +91,30 @@ function App() {
         }
     }
 
-    async function fetchAddress() {
-        // Keplr returns only an active address despite it's in a form of an array
-        const accounts = await client.sendCustomRequest({
-            id: Math.floor(Math.random() * 100000),
-            method: "keplr_get_key_wallet_connect_v1",
-            params: [CHAIN_ID],
-        });
-        console.log('fetched account:', accounts[0]);
-        return accounts[0].bech32Address;
-    }
-
     async function handleSignArbitraryMsg() {
-        const [resp] = await client.sendCustomRequest({
-            id: Math.floor(Math.random() * 100000),
-            method: "keplr_sign_free_message_wallet_connect_v1",
-            params: [CHAIN_ID, address, msgToSign],
+        const [resp] = await signClient.request({
+            // chainId: CAIP_BLOCKCHAIN_ID,
+            chainId: `finschia:${CHAIN_ID}`,
+            request: {
+                method: "cosmos_sign_free_message",
+                params: {
+                    msg: msgToSign,
+                    signerAddress: address
+                }    
+            },
+            topic: session.topic
         });
         setSignature(resp.signature);
     }
 
     return (
-        <div className="App" style={{ backgroundColor: client.session.key ? 'white' : 'grey' }}>
+        <div className="App">
             <div>
                 <img src="https://i.pinimg.com/600x315/93/3e/14/933e14abb0241584fd6d5a31bea1ce7b.jpg"></img>
             </div>
             <h1>dApp Example</h1>
-            <h2>WalletConnect v1 + Vault</h2>
-            <div>Session URI: {sessionUri}</div>
+            <h2>WalletConnect v2 + Vault</h2>
+            <div>WC URI: {wcUri}</div>
             
             <div className="card">
                 <div hidden={!!address}>
@@ -110,7 +124,7 @@ function App() {
                         </button>
                     </div>
                     <div>
-                        <a href={getDynamicLinkUrl(sessionUri)}>Dynamic link</a>
+                        <a href={getDynamicLinkUrl(connection.uri)}>Dynamic link</a>
                     </div>
                 </div>
                 <div hidden={!address}>
@@ -133,9 +147,8 @@ function App() {
             </div>
             <footer>
                 <h3>
-                    <a href='https://github.com/dosivault/wc_v1_example'>Source code</a>
+                    <a href='https://github.com/dosivault/wc_v2_example'>Source code</a>
                 </h3>
-                <button onClick={() => { client.killSession() }}>Kill Session Manually (only for Debugging)</button>
                 <div className='card'>
                     <label>Dynamic link base</label>
                     <input  type="url" value={dynamicLinkBase} onChange={ e=> setDynamicLinkBase(e.target.value) } />
