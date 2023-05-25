@@ -6,8 +6,7 @@ import './App.css'
 
 // Your dapp's Project ID from https://cloud.walletconnect.com/
 const WC_PROJECT_ID = '9e1152b9dc0318eea105dc31238fbc00';
-// CAUTION) it'll be changed to `finschia-2` around the end of May 2023
-const CHAIN_ID = 'finschia-1';
+const CHAIN_ID = 'finschia-2';
 // https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-2.md
 const CAIP_BLOCKCHAIN_ID = `cosmos:${CHAIN_ID}`
 const signClient = await SignClient.init({
@@ -80,6 +79,15 @@ function App() {
         // address from 'cosmos' namespace account
         const bech32 = parseAccount(ses.namespaces.cosmos.accounts[0]).bech32;
         setAddress(bech32);
+
+        const accountsResp = await signClient.request({
+            chainId: CAIP_BLOCKCHAIN_ID,
+            request: {
+                method: "cosmos_getAccounts"
+            },
+            topic: ses.topic
+        });
+        console.log('accountsResp', accountsResp);
     }
 
     function getDynamicLinkUrl(wcUrl) {
