@@ -11,6 +11,7 @@ export default defineConfig({
     react()
   ],
   build: {
-    minify: false
+    minify: false,
+    target: 'esnext'
   }
 })
