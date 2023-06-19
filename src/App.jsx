@@ -1,24 +1,61 @@
-import {useEffect, useState} from 'react'
+import {useEffect, useRef, useState} from 'react'
 import { SignClient } from '@walletconnect/sign-client';
 import { Web3Modal } from '@web3modal/standalone';
 import './App.css'
 
 
 // Your dapp's Project ID from https://cloud.walletconnect.com/
-const WC_PROJECT_ID = '9e1152b9dc0318eea105dc31238fbc00';
+const WC_PROJECT_ID = 'cc3b2ecffec2ba45dfa80295a62b3f5a';
 const CHAIN_ID = 'finschia-2';
+
 // https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-2.md
 const CAIP_BLOCKCHAIN_ID = `cosmos:${CHAIN_ID}`
-const signClient = await SignClient.init({
+
+const web3modal = new Web3Modal({
+    walletConnectVersion: 2,
     projectId: WC_PROJECT_ID,
-    metadata: {
-        name: "WC2 dApp",
-        description: "WalletConnect v2 Dapp Example for DOSI Vault Extension",
-        url: "https://dapp.example.com",
-        icons: ["https://i.pinimg.com/600x315/93/3e/14/933e14abb0241584fd6d5a31bea1ce7b.jpg"],
-    },
+    standaloneChains: [CAIP_BLOCKCHAIN_ID]
 });
-const connection = await signClient.connect({});
+
+function initSignClient() {
+    const [uri, setUri] = useState('')
+    const [address, setAddress] = useState(null);
+    const [session, setSession] = useState(null);
+    const signClient = useRef(null)
+
+    useEffect(() => {
+        (async () => {
+            const result =  await SignClient.init({
+                projectId: WC_PROJECT_ID,
+                metadata: {
+                    name: "WC2 dApp",
+                    description: "WalletConnect v2 Dapp Example for DOSI Vault Extension",
+                    url: "https://dapp.example.com",
+                    icons: ["https://i.pinimg.com/600x315/93/3e/14/933e14abb0241584fd6d5a31bea1ce7b.jpg"],
+                },
+            })
+            signClient.current = result
+            signClient.current.on("session_delete", () => {
+                window.location.reload();
+            });
+            const { uri, approval }  = await signClient.current.connect({});
+            setUri(uri)
+            const wcSession = await approval();
+            web3modal.closeModal();
+            setSession(wcSession);
+            const bech32 = parseAccount(wcSession.namespaces.cosmos.accounts[0]).bech32;
+            setAddress(bech32);
+        })();
+    }, [])
+
+    return {
+        uri,
+        address,
+        session,
+        signClient: signClient.current
+    }
+}
+
 
 function parseAccount(account) {
     // example `cosmos:finschia-beta-2:link1a509xf4stwa9yaec5vu64fcem5zeyc3t7t47fc`
@@ -30,73 +67,20 @@ function parseAccount(account) {
     }
 }
 
-async function initSignClient() {
-    
-}
-
 function App() {
-    const [wcUri, setWcUri] = useState(null);
-    const [address, setAddress] = useState(null);
-    const [session, setSession] = useState(null);
     const [msgToSign, setMsgToSign] = useState('Any text');
     const [signature, setSignature] = useState(null);
     const [dynamicLinkBase, setDynamicLinkBase] = useState("https://dosivault.page.link/qL6j");
-    
-    useEffect(() => {
-        // componentDidMount()
-        console.log('like componentDidMount()');
-    
-        console.log('signClient', signClient);
 
-        signClient.on("disconnect", (error, payload) => {
-            console.log('on "disconnect"');
-            setWcUri(null);
-            setAddress(null);
-        });
-        setWcUri(connection.uri);
-    
-        return () => {    // clean up (componetWillUnmount)
-            console.log('like componentWillUnmount()');
-            signClient.removeAllListeners("connect");
-            signClient.removeAllListeners("disconnect");
-        };
-    }, []);
-    
+    const { uri, signClient, address, session } = initSignClient()
+
     async function showQRCodeModal() {
-        console.log('waiting approval() to be completed');
-        const web3modal = new Web3Modal({
-            walletConnectVersion: 2,
-            projectId: WC_PROJECT_ID,
-            standaloneChains: [CAIP_BLOCKCHAIN_ID]
-        });
-        await web3modal.openModal({
-            uri: connection.uri
-        });
-        const ses = await connection.approval();
-        console.log('session approved', ses);
-        setSession(ses);
-        web3modal.closeModal();
-        // address from 'cosmos' namespace account
-        const bech32 = parseAccount(ses.namespaces.cosmos.accounts[0]).bech32;
-        setAddress(bech32);
-
-        const accountsResp = await signClient.request({
-            chainId: CAIP_BLOCKCHAIN_ID,
-            request: {
-                method: "cosmos_getAccounts"
-            },
-            topic: ses.topic
-        });
-        console.log('accountsResp', accountsResp);
+        web3modal.openModal({uri});
     }
 
     function getDynamicLinkUrl(wcUrl) {
-        if(!!wcUrl) {
-            const encodedUrl = encodeURIComponent(wcUrl);
-            return `${dynamicLinkBase}?uri_wc=${encodedUrl}`;
-        } else {
-            return dynamicLinkBase;
-        }
+        const encodedUrl = encodeURIComponent(wcUrl);
+        return `${dynamicLinkBase}?uri_wc=${encodedUrl}`;
     }
 
     async function handleSignArbitraryMsg() {
@@ -111,7 +95,6 @@ function App() {
             },
             topic: session.topic
         });
-        console.log('sign resp', resp);
         setSignature(resp.signature.signature);
     }
 
@@ -122,17 +105,24 @@ function App() {
             </div>
             <h1>dApp Example</h1>
             <h2>WalletConnect v2 + Vault</h2>
-            <div>WC URI: {wcUri}</div>
+            <div>WC URI: {uri}</div>
             
             <div className="card">
                 <div hidden={!!address}>
                     <div>
-                        <button onClick={showQRCodeModal}>
-                            Connect (QR Modal)
-                        </button>
+                        {
+                            uri ? (
+                                <button onClick={showQRCodeModal}>
+                                    Connect (QR Modal)
+                                </button>
+                            ) : null
+                        }
                     </div>
                     <div>
-                        <a href={getDynamicLinkUrl(connection.uri)}>Dynamic link</a>
+                        {
+                            uri ? (<a href={getDynamicLinkUrl(uri)}>Dynamic link</a>) : null
+                        }
+                        
                     </div>
                 </div>
                 <div hidden={!address}>
@@ -144,7 +134,7 @@ function App() {
                         <button onClick={handleSignArbitraryMsg}>
                             Off-chain sign
                         </button>
-                        <a href={getDynamicLinkUrl()}>
+                        <a href={getDynamicLinkUrl(uri)}>
                             Bring Vault to front
                         </a>
                         <div>
