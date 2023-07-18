@@ -5,7 +5,7 @@ import './App.css'
 
 
 // Your dapp's Project ID from https://cloud.walletconnect.com/
-const WC_PROJECT_ID = 'cc3b2ecffec2ba45dfa80295a62b3f5a';
+const WC_PROJECT_ID = '9e1152b9dc0318eea105dc31238fbc00';
 const CHAIN_ID = 'finschia-2';
 
 // https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-2.md
