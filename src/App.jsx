@@ -3,8 +3,6 @@ import { SignClient } from '@walletconnect/sign-client';
 import { Web3Modal } from '@web3modal/standalone';
 import './App.css'
 
-import { Registry, encodePubkey, makeAuthInfoBytes, makeSignDoc } from "@cosmjs/proto-signing";
-import { defaultRegistryTypes } from '@cosmjs/stargate';
 import { makeSignDoc as makeAminoSignDoc} from "@cosmjs/amino"
 
 // Your dapp's Project ID from https://cloud.walletconnect.com/
@@ -132,69 +130,6 @@ function App() {
                 chainId: CAIP_BLOCKCHAIN_ID,
                 request: {
                     method: "cosmos_signAmino",
-                    params: params
-                },
-            });
-            setSignature(resp.signature.signature);
-        }
-                
-        // with proto signing
-        {
-            const accountResponse = await signClient.request({
-                chainId: CAIP_BLOCKCHAIN_ID,
-                request: {
-                    "method": "cosmos_getAccounts",
-                    "params": {}
-                },
-                topic: session.topic
-            })
-
-            const pubkey = encodePubkey({
-                type: "tendermint/PubKeySecp256k1",
-                value: accountResponse[0].pubkey
-            })
-
-            const registry = new Registry(defaultRegistryTypes);
-
-            const sendMsg = {
-                typeUrl: "/cosmos.bank.v1beta1.MsgSend",
-                value: {
-                fromAddress: address,
-                toAddress: address,
-                amount: [{
-                    amount: msgToSign,
-                    denom: 'cony'}],
-                },
-            };
-
-            const txBodyEncodeObject = {
-                typeUrl: "/cosmos.tx.v1beta1.TxBody",
-                value: {
-                    messages: [sendMsg],
-                    memo: 'test',
-                },
-            };
-
-            const txBodyBytes = registry.encode(txBodyEncodeObject);
-
-            const gasPrice = {amount: "0.025", denom: 'cony'}
-            const gasLimit = 100_000;
-            
-            const authInfoBytes = makeAuthInfoBytes([{ pubkey, sequence }], [gasPrice], gasLimit)
-            const signDoc = makeSignDoc(txBodyBytes, authInfoBytes, CHAIN_ID, Number(accountNumber));
-
-            const params = {
-                signerAddress: address,
-                signDoc: signDoc
-            }
-
-            console.log(session)
-            console.log(params)
-            const resp = await signClient.request({
-                topic: session.topic,
-                chainId: CAIP_BLOCKCHAIN_ID,
-                request: {
-                    method: "cosmos_signDirect",
                     params: params
                 },
             });
