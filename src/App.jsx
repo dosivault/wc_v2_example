@@ -87,8 +87,8 @@ function App() {
 
     async function handleSignArbitraryMsg() {
         const LCD_ENDPOINT= 'https://lbs-finschianw.line-apps.com'
-        const localhost = 'http://localhost:1317'
-        const url = `${localhost}/cosmos/auth/v1beta1/accounts/${address}`;
+        // const localhost = 'http://localhost:1317'
+        const url = `${LCD_ENDPOINT}/cosmos/auth/v1beta1/accounts/${address}`;
         const response = await fetch(url);
         const data = await response.json();
         const sequence = data.account.sequence;
