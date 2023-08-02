@@ -125,7 +125,7 @@ function App() {
                 signerAddress: address,
                 signDoc: signDoc
             }
-            setMsgToSign(JSON.stringify(signDoc));
+            setMsgToSign(JSON.stringify(signDoc, null, 2));
 
             console.log(session)
             console.log(params)
