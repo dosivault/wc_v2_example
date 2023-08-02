@@ -12,7 +12,7 @@ const CHAIN_ID = 'finschia-2';
 // https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-2.md
 const CAIP_BLOCKCHAIN_ID = `cosmos:${CHAIN_ID}`
 
-const LCD_ENDPOINT= 'https://lbs-finschianw.line-apps.com'
+const LCD_ENDPOINT= 'https://dsvt-finschia.line-apps.com'
 // const LOCALHOST = 'http://localhost:1317'
 
 const web3modal = new Web3Modal({
