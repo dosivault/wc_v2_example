@@ -74,6 +74,7 @@ function parseAccount(account) {
 
 function App() {
     const [sendAmount, setSendAmount] = useState('0');
+    const [msgToSign, setMsgToSign] = useState(null);
     const [signature, setSignature] = useState(null);
     const [dynamicLinkBase, setDynamicLinkBase] = useState("https://dosivault.page.link/qL6j");
 
@@ -124,8 +125,11 @@ function App() {
                 signerAddress: address,
                 signDoc: signDoc
             }
+            setMsgToSign(JSON.stringify(signDoc));
+
             console.log(session)
             console.log(params)
+
             const resp = await signClient.request({
                 topic: session.topic,
                 chainId: CAIP_BLOCKCHAIN_ID,
@@ -179,6 +183,9 @@ function App() {
                         </a>
                         <div>
                             Signature: <p>{signature}</p>
+                        </div>
+                        <div>
+                            Msg to Sign: <p>{msgToSign}</p>
                         </div>
                     </div>
                 </div>
