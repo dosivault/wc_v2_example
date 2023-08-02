@@ -90,10 +90,10 @@ function App() {
 
     async function handleSignArbitraryMsg() {
         const url = `${LCD_ENDPOINT}/cosmos/auth/v1beta1/accounts/${address}`;
-        const response = await fetch(url);
-        const data = await response.json();
-        const sequence = data.account.sequence;
-        const accountNumber = data.account.account_number;
+        const accountResponse = await fetch(url);
+        const accountData = await accountResponse.json();
+        const sequence = accountData.account.sequence;
+        const accountNumber = accountData.account.account_number;
 
         // with amino signing
         {
