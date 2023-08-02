@@ -73,7 +73,7 @@ function parseAccount(account) {
 }
 
 function App() {
-    const [msgToSign, setMsgToSign] = useState('0');
+    const [sendAmount, setSendAmount] = useState('0');
     const [signature, setSignature] = useState(null);
     const [dynamicLinkBase, setDynamicLinkBase] = useState("https://dosivault.page.link/qL6j");
 
@@ -102,7 +102,7 @@ function App() {
                 value: {
                   amount: [
                     {
-                      amount: msgToSign,
+                      amount: sendAmount,
                       denom: 'cony',
                     },
                   ],
@@ -170,7 +170,7 @@ function App() {
 
                     <div style={{borderBlock: "1px dotted"}}>
                         Message to sign :
-                        <input value={msgToSign} onChange={e => setMsgToSign(e.target.value)}/>
+                        <input value={sendAmount} onChange={e => setSendAmount(e.target.value)}/>
                         <button onClick={handleSignArbitraryMsg}>
                             Off-chain sign
                         </button>
