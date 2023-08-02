@@ -12,6 +12,9 @@ const CHAIN_ID = 'finschia-2';
 // https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-2.md
 const CAIP_BLOCKCHAIN_ID = `cosmos:${CHAIN_ID}`
 
+const LCD_ENDPOINT= 'https://lbs-finschianw.line-apps.com'
+// const LOCALHOST = 'http://localhost:1317'
+
 const web3modal = new Web3Modal({
     walletConnectVersion: 2,
     projectId: WC_PROJECT_ID,
@@ -86,8 +89,6 @@ function App() {
     }
 
     async function handleSignArbitraryMsg() {
-        const LCD_ENDPOINT= 'https://lbs-finschianw.line-apps.com'
-        // const localhost = 'http://localhost:1317'
         const url = `${LCD_ENDPOINT}/cosmos/auth/v1beta1/accounts/${address}`;
         const response = await fetch(url);
         const data = await response.json();
