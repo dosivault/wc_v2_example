@@ -3,6 +3,7 @@ import { SignClient } from '@walletconnect/sign-client';
 import { Web3Modal } from '@web3modal/standalone';
 import './App.css'
 
+import { makeSignDoc as makeAminoSignDoc} from "@cosmjs/amino"
 
 // Your dapp's Project ID from https://cloud.walletconnect.com/
 const WC_PROJECT_ID = '9e1152b9dc0318eea105dc31238fbc00';
@@ -10,6 +11,9 @@ const CHAIN_ID = 'finschia-2';
 
 // https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-2.md
 const CAIP_BLOCKCHAIN_ID = `cosmos:${CHAIN_ID}`
+
+const LCD_ENDPOINT= 'https://dsvt-finschia.line-apps.com'
+// const LOCALHOST = 'http://localhost:1317'
 
 const web3modal = new Web3Modal({
     walletConnectVersion: 2,
@@ -44,6 +48,7 @@ function initSignClient() {
             web3modal.closeModal();
             setSession(wcSession);
             const bech32 = parseAccount(wcSession.namespaces.cosmos.accounts[0]).bech32;
+            console.log(wcSession.namespaces.cosmos.accounts[0]);
             setAddress(bech32);
         })();
     }, [])
@@ -68,7 +73,8 @@ function parseAccount(account) {
 }
 
 function App() {
-    const [msgToSign, setMsgToSign] = useState('Any text');
+    const [sendAmount, setSendAmount] = useState('0');
+    const [msgToSign, setMsgToSign] = useState(null);
     const [signature, setSignature] = useState(null);
     const [dynamicLinkBase, setDynamicLinkBase] = useState("https://dosivault.page.link/qL6j");
 
@@ -84,18 +90,56 @@ function App() {
     }
 
     async function handleSignArbitraryMsg() {
-        const resp = await signClient.request({
-            chainId: CAIP_BLOCKCHAIN_ID,
-            request: {
-                method: "cosmos_sign_free_message",
-                params: {
-                    msg: msgToSign,
-                    signerAddress: address
-                }    
-            },
-            topic: session.topic
-        });
-        setSignature(resp.signature.signature);
+        const url = `${LCD_ENDPOINT}/cosmos/auth/v1beta1/accounts/${address}`;
+        const accountResponse = await fetch(url);
+        const accountData = await accountResponse.json();
+        const sequence = accountData.account.sequence;
+        const accountNumber = accountData.account.account_number;
+
+        // with amino signing
+        {
+            const sendMsg = {
+                type: "cosmos-sdk/MsgSend",
+                value: {
+                  amount: [
+                    {
+                      amount: sendAmount,
+                      denom: 'cony',
+                    },
+                  ],
+                  from_address: address,
+                  to_address: address,
+                },
+              };
+
+            const gasPrice = {amount: "0.025", denom: 'cony'}
+            const gasLimit = '100000';
+            const fee = {
+                amount: [gasPrice],
+                gas: gasLimit,
+              };
+            
+            const signDoc = makeAminoSignDoc([sendMsg], fee, CHAIN_ID, "test", accountNumber, sequence);
+
+            const params = {
+                signerAddress: address,
+                signDoc: signDoc
+            }
+            setMsgToSign(JSON.stringify(signDoc, null, 2));
+
+            console.log(session)
+            console.log(params)
+
+            const resp = await signClient.request({
+                topic: session.topic,
+                chainId: CAIP_BLOCKCHAIN_ID,
+                request: {
+                    method: "cosmos_signAmino",
+                    params: params
+                },
+            });
+            setSignature(resp.signature.signature);
+        }
     }
 
     return (
@@ -130,7 +174,7 @@ function App() {
 
                     <div style={{borderBlock: "1px dotted"}}>
                         Message to sign :
-                        <input value={msgToSign} onChange={e => setMsgToSign(e.target.value)}/>
+                        <input value={sendAmount} onChange={e => setSendAmount(e.target.value)}/>
                         <button onClick={handleSignArbitraryMsg}>
                             Off-chain sign
                         </button>
@@ -139,6 +183,9 @@ function App() {
                         </a>
                         <div>
                             Signature: <p>{signature}</p>
+                        </div>
+                        <div>
+                            Msg to Sign: <p>{msgToSign}</p>
                         </div>
                     </div>
                 </div>

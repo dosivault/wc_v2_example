@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@cosmjs/amino": "^0.31.0",
     "@walletconnect/core": "2.4.0",
     "@walletconnect/sign-client": "2.4.0",
     "@web3modal/standalone": "^2.4.1",
