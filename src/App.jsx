@@ -121,6 +121,7 @@ function App() {
     const [signed, setSigned] = useState(null);
     const [aminoPubkey, setAminoPubkey] = useState(null);
     const [dynamicLinkBase, setDynamicLinkBase] = useState("https://dosivault.page.link/qL6j");
+    const [isBroadcasting, setIsBroadcasting] = useState(false);
 
     const { uri, signClient, address, session } = initSignClient()
 
@@ -186,7 +187,11 @@ function App() {
         const txBytes = getProtoTxFromAmino(aminoPubkey, signed, signature);
 
         const client = await FinschiaClient.connect(API_ENDPOINT);
+
+        setIsBroadcasting(true);
         const result = await client.broadcastTx(txBytes);
+        setIsBroadcasting(false);
+        
         console.log(result);
     }
 
@@ -236,9 +241,9 @@ function App() {
                             Signature: <p>{signature}</p>
                         </div>
                         <div hidden={!signature}>
-                            <button onClick={handleBroadcastClicked}>
+                            {isBroadcasting ? (<span>Waiting...</span>) : (<button onClick={handleBroadcastClicked}>
                                 Broadcast
-                            </button>
+                            </button>)}
                         </div>
                     </div>
                 </div>
