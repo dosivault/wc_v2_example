@@ -3,7 +3,14 @@ import { SignClient } from '@walletconnect/sign-client';
 import { Web3Modal } from '@web3modal/standalone';
 import './App.css'
 
-import { makeSignDoc as makeAminoSignDoc} from "@cosmjs/amino"
+import { makeSignDoc as makeAminoSignDoc } from "@cosmjs/amino"
+import { encodePubkey, Registry, makeAuthInfoBytes } from "@cosmjs/proto-signing";
+import { SignMode } from "cosmjs-types/cosmos/tx/signing/v1beta1/signing";
+import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
+import { createDefaultAminoConverters, defaultRegistryTypes, AminoTypes, calculateFee, GasPrice } from "@cosmjs/stargate";
+import { Int53 } from "@cosmjs/math";
+import { fromBase64 } from "@cosmjs/encoding";
+import { FinschiaClient } from "@finschia/finschia";
 
 // Your dapp's Project ID from https://cloud.walletconnect.com/
 const WC_PROJECT_ID = '9e1152b9dc0318eea105dc31238fbc00';
@@ -12,8 +19,12 @@ const CHAIN_ID = 'finschia-2';
 // https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-2.md
 const CAIP_BLOCKCHAIN_ID = `cosmos:${CHAIN_ID}`
 
-const LCD_ENDPOINT= 'https://dsvt-finschia.line-apps.com'
+const LCD_ENDPOINT= 'https://dsvt-finschianw.line-apps.com'
+const API_ENDPOINT = 'https://dsvt-finschianw-api.line-apps.com'
 // const LOCALHOST = 'http://localhost:1317'
+
+const aminoTypes = new AminoTypes(createDefaultAminoConverters());
+const registry = new Registry(defaultRegistryTypes);
 
 const web3modal = new Web3Modal({
     walletConnectVersion: 2,
@@ -72,10 +83,43 @@ function parseAccount(account) {
     }
 }
 
+function getProtoTxFromAmino(aminoPubkey, signed, signature){
+    const txBody = {
+        typeUrl: "/cosmos.tx.v1beta1.TxBody",
+        value: {
+            messages: signed.msgs.map((msg) => aminoTypes.fromAmino(msg)),
+            memo: signed.memo,
+        },
+    };
+    const txBodyBytes = registry.encode(txBody);
+
+    const gasLimit = Int53.fromString(signed.fee.gas).toNumber();
+    const sequence = Int53.fromString(signed.sequence).toNumber();
+    const authInfoBytes = makeAuthInfoBytes(
+        [{ pubkey: encodePubkey(aminoPubkey), sequence }],
+        signed.fee.amount,
+        gasLimit,
+        signed.fee.granter,
+        signed.fee.payer,
+        SignMode.SIGN_MODE_LEGACY_AMINO_JSON,
+    );
+
+    const txRaw = TxRaw.fromPartial({
+        bodyBytes: txBodyBytes,
+        authInfoBytes: authInfoBytes,
+        signatures: [fromBase64(signature)],
+    });
+    const txBytes = TxRaw.encode(txRaw).finish();
+    return txBytes;
+}
+
+
 function App() {
     const [sendAmount, setSendAmount] = useState('0');
     const [msgToSign, setMsgToSign] = useState(null);
     const [signature, setSignature] = useState(null);
+    const [signed, setSigned] = useState(null);
+    const [aminoPubkey, setAminoPubkey] = useState(null);
     const [dynamicLinkBase, setDynamicLinkBase] = useState("https://dosivault.page.link/qL6j");
 
     const { uri, signClient, address, session } = initSignClient()
@@ -112,24 +156,17 @@ function App() {
                 },
               };
 
-            const gasPrice = {amount: "0.025", denom: 'cony'}
-            const gasLimit = '100000';
-            const fee = {
-                amount: [gasPrice],
-                gas: gasLimit,
-              };
+            const gasPrice = GasPrice.fromString("0.025cony");
+            const gasLimit = 100_000;
+            const fee = calculateFee(gasLimit, gasPrice)
             
             const signDoc = makeAminoSignDoc([sendMsg], fee, CHAIN_ID, "test", accountNumber, sequence);
+            setMsgToSign(JSON.stringify(signDoc, null, 2));
 
             const params = {
                 signerAddress: address,
                 signDoc: signDoc
             }
-            setMsgToSign(JSON.stringify(signDoc, null, 2));
-
-            console.log(session)
-            console.log(params)
-
             const resp = await signClient.request({
                 topic: session.topic,
                 chainId: CAIP_BLOCKCHAIN_ID,
@@ -138,8 +175,19 @@ function App() {
                     params: params
                 },
             });
+
             setSignature(resp.signature.signature);
+            setAminoPubkey(resp.signature.pub_key);
+            setSigned(resp.signed);
         }
+    }
+
+    async function handleBroadcastClicked(){
+        const txBytes = getProtoTxFromAmino(aminoPubkey, signed, signature);
+
+        const client = await FinschiaClient.connect(API_ENDPOINT);
+        const result = await client.broadcastTx(txBytes);
+        console.log(result);
     }
 
     return (
@@ -182,10 +230,15 @@ function App() {
                             Bring Vault to front
                         </a>
                         <div>
-                            Signature: <p>{signature}</p>
+                            Msg to Sign: <p>{msgToSign}</p>
                         </div>
                         <div>
-                            Msg to Sign: <p>{msgToSign}</p>
+                            Signature: <p>{signature}</p>
+                        </div>
+                        <div hidden={!signature}>
+                            <button onClick={handleBroadcastClicked}>
+                                Broadcast
+                            </button>
                         </div>
                     </div>
                 </div>
